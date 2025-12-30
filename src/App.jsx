@@ -345,7 +345,7 @@ export default function App() {
                 autoFocus
                 className="w-full p-5 bg-slate-50 rounded-2xl border-2 border-transparent focus:border-indigo-500 outline-none transition-all font-mono text-center text-2xl" 
                 placeholder="••••"
-                onChange={(e) => { if(e.target.value === 'admin') setView('admin-dashboard'); }}
+                onChange={(e) => { if(e.target.value === 'minar7917') setView('admin-dashboard'); }}
               />
             </div>
             <button onClick={() => setView('landing')} className="w-full text-slate-400 font-bold text-sm py-2">取消</button>

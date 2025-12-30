@@ -307,14 +307,14 @@ const AdminEditQuestionModal = memo(({ editingQ, setEditingQ, saveQuestion }) =>
         onClick={() => insertFormat(targetRef, 'sup', field, optionIdx)}
         className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-[0.65rem] font-black border border-blue-100 hover:bg-blue-100 transition-colors"
       >
-        <Superscript size={14} /> 上標 (x²)
+        <Superscript size={14} /> 上標(需配合$$) (x²)
       </button>
       <button 
         type="button"
         onClick={() => insertFormat(targetRef, 'sub', field, optionIdx)}
         className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-50 text-cyan-600 rounded-lg text-[0.65rem] font-black border border-cyan-100 hover:bg-cyan-100 transition-colors"
       >
-        <Subscript size={14} /> 下標 (x₂)
+        <Subscript size={14} /> 下標(需配合$$) (x₂)
       </button>
       <button 
         type="button"

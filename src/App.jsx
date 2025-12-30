@@ -23,7 +23,6 @@ const myFirebaseConfig = {
   measurementId: "G-T7K56Q5Z51"
 };
 
-// 優先使用環境變數（預覽環境），若無則使用手動填寫的配置
 const firebaseConfig = typeof __firebase_config !== 'undefined' 
   ? JSON.parse(__firebase_config) 
   : myFirebaseConfig;
@@ -33,7 +32,6 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'ds-final-exam';
 
-// --- 初始題目數據 (範例題目) ---
 const INITIAL_QUESTIONS = [
   { id: 'q1', type: 'choice', text: '在時間複雜度分析中, Big-Oh 記號 O(g(n)) 主要用來表示演算法執行時間的哪個量度?', options: ['A. 最好狀況(Best Case)', 'B. 最壞狀況(Worst Case)', 'C. 平均狀況(Average Case)', 'D. 實際執行時間'], answer: 'B', points: 4 },
   { id: 'q2', type: 'choice', text: '若有費氏數列定義如下：\nint F(int n) {\n    if (n <= 1) return n;\n    return F(n-1) + F(n-2);\n}\n請問 F(5) 之回傳值為何？', options: ['A. 5', 'B. 8', 'C. 13', 'D. 3'], answer: 'A', points: 4 },
@@ -99,7 +97,7 @@ const StudentLoginView = ({ studentInfo, setStudentInfo, onStartExam, onBack }) 
           />
         </div>
         <div className="pt-4 text-center">
-          <div className="mb-4 bg-red-50 text-red-600 p-4 rounded-2xl text-[0.7rem] font-bold leading-tight">
+          <div className="mb-4 bg-red-50 text-red-600 p-4 rounded-2xl text-[0.7rem] font-bold leading-tight text-left">
             ⚠ 警告：進入考試後，若切換分頁、縮小視窗或切換應用程式，系統將自動判定結束並提交現有答案。
           </div>
           <button 
@@ -129,6 +127,17 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
 
   const stateRef = useRef({ questions, currentAnswers, studentInfo, view });
+  
+  // 樣式注入：自動載入 Tailwind CSS 以防外部檔案缺失
+  useEffect(() => {
+    if (!document.getElementById('tailwind-cdn')) {
+      const script = document.createElement('script');
+      script.id = 'tailwind-cdn';
+      script.src = "https://cdn.tailwindcss.com";
+      document.head.appendChild(script);
+    }
+  }, []);
+
   useEffect(() => {
     stateRef.current = { questions, currentAnswers, studentInfo, view };
   }, [questions, currentAnswers, studentInfo, view]);
@@ -242,7 +251,7 @@ export default function App() {
           </div>
         </header>
         <main className="max-w-3xl mx-auto p-4 py-8 space-y-8">
-          <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-start gap-3 text-amber-800 text-xs font-bold shadow-sm">
+          <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-start gap-3 text-amber-800 text-xs font-bold shadow-sm text-left">
             <AlertTriangle className="shrink-0" size={18} />
             <div>
               重要：切勿點擊其他頁籤或視窗通知。一旦離開焦點，系統將立即自動交卷。
@@ -326,8 +335,8 @@ export default function App() {
   if (view === 'admin-login') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4 text-center">
-        <div className="bg-white p-12 rounded-[3rem] w-full max-w-md shadow-2xl border border-white/5">
-          <h2 className="text-3xl font-black mb-10 text-slate-800 tracking-tight">管理員登入</h2>
+        <div className="bg-white p-12 rounded-[3rem] w-full max-w-md shadow-2xl border border-white/5 text-left">
+          <h2 className="text-3xl font-black mb-10 text-slate-800 tracking-tight text-center">管理員登入</h2>
           <div className="space-y-6">
             <div className="text-left">
               <label className="block text-xs font-black text-slate-400 mb-2 tracking-widest uppercase ml-1">Password</label>
@@ -406,11 +415,11 @@ const AdminDashboard = ({ records, questions, onBack, appId }) => {
         </div>
 
         {tab === 'records' ? (
-          <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden">
-            <div className="overflow-x-auto">
+          <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200 overflow-hidden text-left">
+            <div className="overflow-x-auto text-left">
               <table className="w-full text-left">
                 <thead className="bg-slate-50 border-b">
-                  <tr className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest">
+                  <tr className="text-[0.65rem] font-black text-slate-400 uppercase tracking-widest text-left">
                     <th className="p-6">Student</th>
                     <th>Status</th>
                     <th>Score</th>
@@ -418,9 +427,9 @@ const AdminDashboard = ({ records, questions, onBack, appId }) => {
                     <th className="p-6 text-center">Detail</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-slate-100 text-left">
                   {records.sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp)).map(r => (
-                    <tr key={r.id} className="hover:bg-slate-50 transition">
+                    <tr key={r.id} className="hover:bg-slate-50 transition text-left">
                       <td className="p-6">
                         <div className="font-black text-slate-800">{r.studentName}</div>
                         <div className="font-mono text-xs text-indigo-500">{r.studentId}</div>
@@ -443,27 +452,28 @@ const AdminDashboard = ({ records, questions, onBack, appId }) => {
                   ))}
                 </tbody>
               </table>
+              {records.length === 0 && <div className="p-20 text-center text-slate-400 font-bold">目前暫無答題紀錄</div>}
             </div>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-6 text-left">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-black text-slate-800">試題庫 ({questions.length})</h3>
               <button onClick={() => setEditingQ({ id: 'new', type: 'choice', text: '', answer: 'A', points: 4, options: ['', '', '', ''] })} className="bg-indigo-600 text-white px-8 py-3 rounded-2xl flex items-center gap-2 hover:bg-indigo-700 font-black transition"><Plus size={20} /> 新增題目</button>
             </div>
-            <div className="grid grid-cols-1 gap-6">
+            <div className="grid grid-cols-1 gap-6 text-left">
               {questions.map((q, idx) => (
-                <div key={q.id} className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col md:flex-row gap-6 items-start">
-                  <div className="flex-1 w-full overflow-hidden">
-                    <div className="flex items-center gap-3 mb-4">
+                <div key={q.id} className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col md:flex-row gap-6 items-start text-left">
+                  <div className="flex-1 w-full overflow-hidden text-left">
+                    <div className="flex items-center gap-3 mb-4 text-left">
                       <span className="bg-slate-100 text-slate-500 px-3 py-1 rounded-xl text-xs font-black">NO. {idx+1}</span>
                       <span className={`px-3 py-1 rounded-xl text-[0.6rem] font-black uppercase ${q.type === 'choice' ? 'bg-blue-100 text-blue-600' : 'bg-purple-100 text-purple-600'}`}>{q.type === 'choice' ? '選擇' : '填空'}</span>
                     </div>
-                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 overflow-x-auto">
-                      <p className="font-mono text-sm text-slate-700 whitespace-pre-wrap">{q.text}</p>
+                    <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 overflow-x-auto text-left">
+                      <p className="font-mono text-sm text-slate-700 whitespace-pre-wrap text-left">{q.text}</p>
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 text-left">
                     <button onClick={() => setEditingQ(q)} className="p-4 text-blue-500 hover:bg-blue-50 rounded-2xl"><Edit3 size={24} /></button>
                     <button onClick={() => deleteQuestion(q.id)} className="p-4 text-red-500 hover:bg-red-50 rounded-2xl"><Trash2 size={24} /></button>
                   </div>
@@ -486,7 +496,7 @@ const AdminDashboard = ({ records, questions, onBack, appId }) => {
                 <label className="block text-[0.65rem] font-black text-slate-400 mb-2 uppercase ml-1">題目敘述 (支援縮排)</label>
                 <textarea name="text" defaultValue={editingQ.text} required className="w-full p-6 bg-slate-50 border-2 border-transparent focus:border-indigo-600 focus:bg-white rounded-3xl h-64 outline-none transition-all font-mono text-sm leading-relaxed" placeholder="請在此輸入題目內容..."></textarea>
               </div>
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-2 gap-6 text-left">
                 <div>
                   <label className="block text-[0.65rem] font-black text-slate-400 mb-2 uppercase ml-1">題型</label>
                   <select name="type" defaultValue={editingQ.type} className="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold text-slate-700 border-none">
@@ -499,21 +509,21 @@ const AdminDashboard = ({ records, questions, onBack, appId }) => {
                   <input name="points" type="number" defaultValue={editingQ.points} className="w-full p-4 bg-slate-50 rounded-2xl outline-none font-bold" />
                 </div>
               </div>
-              <div>
+              <div className="text-left">
                 <label className="block text-[0.65rem] font-black text-slate-400 mb-2 uppercase ml-1">正確答案</label>
                 <input name="answer" defaultValue={editingQ.answer} required className="w-full p-4 bg-slate-50 rounded-2xl outline-none font-mono font-black text-indigo-600" placeholder="A-D 或 填空文字" />
               </div>
               {editingQ.type === 'choice' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-6 rounded-[2rem]">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-6 rounded-[2rem] text-left">
                   {['A', 'B', 'C', 'D'].map((lab, i) => (
-                    <div key={lab}>
+                    <div key={lab} className="text-left">
                       <label className="text-[0.6rem] font-black text-slate-400 mb-1 block uppercase ml-1">選項 {lab}</label>
                       <input name={`opt${lab}`} defaultValue={editingQ.options[i]} placeholder={`輸入選項 ${lab}`} className="w-full p-3 rounded-xl border border-slate-200 outline-none focus:border-indigo-600" />
                     </div>
                   ))}
                 </div>
               )}
-              <div className="pt-4 flex gap-4">
+              <div className="pt-4 flex gap-4 text-left">
                 <button type="submit" className="flex-1 bg-slate-900 text-white py-5 rounded-3xl font-black hover:bg-black transition">儲存題目</button>
                 <button type="button" onClick={() => setEditingQ(null)} className="flex-1 bg-slate-100 text-slate-600 py-5 rounded-3xl font-black">取消</button>
               </div>

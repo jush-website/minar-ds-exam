@@ -17,24 +17,25 @@ import {
   Sigma, Terminal, Square, CheckSquare, Superscript, Subscript, Image as ImageIcon, Loader2
 } from 'lucide-react';
 
-// --- Firebase 配置 ---
-const myFirebaseConfig = {
-  apiKey: "AIzaSyCL6ikY2ZO8JRMqDBguEMa59kX2-is6GpU",
-  authDomain: "ds-final-exam.firebaseapp.com",
-  projectId: "ds-final-exam",
-  storageBucket: "ds-final-exam.firebasestorage.app",
-  messagingSenderId: "1090141287700",
-  appId: "1:1090141287700:web:07038a72f4a972e4c63e01",
-  measurementId: "G-T7K56Q5Z51"
-};
+// --- Firebase 初始化 (使用環境變數) ---
+const firebaseConfig = typeof __firebase_config !== 'undefined' 
+  ? JSON.parse(__firebase_config) 
+  : {
+      apiKey: "",
+      authDomain: "",
+      projectId: "",
+      storageBucket: "",
+      messagingSenderId: "",
+      appId: ""
+    };
 
-const appId = 'ds-final-exam-pro'; 
-const app = initializeApp(myFirebaseConfig);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'ds-final-exam-pro';
+const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-// --- 1. 格式化渲染組件 (支援 LaTeX, 程式碼, 圖片) ---
+// --- 1. 格式化渲染組件 ---
 const FormattedText = memo(({ content, className = "" }) => {
   const containerRef = useRef(null);
 
@@ -44,7 +45,6 @@ const FormattedText = memo(({ content, className = "" }) => {
     }
   }, [content]);
 
-  // 解析圖片語法 ![image](url)
   const renderContent = (text) => {
     if (!text) return " ";
     const parts = text.split(/(!\[.*?\]\(.*?\))/g);
@@ -78,7 +78,7 @@ const FormattedText = memo(({ content, className = "" }) => {
   );
 });
 
-// --- 2. 通用子組件 ---
+// --- 2. 各視圖組件 (與原邏輯相同，僅微調樣式與穩定性) ---
 
 const LandingView = memo(({ onStart, activeExam, onAdminLogin }) => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 p-4 text-white font-sans">
@@ -186,7 +186,7 @@ const StudentExamView = memo(({ questions, studentInfo, currentAnswers, setCurre
         {questions.length === 0 ? <div className="bg-white p-20 rounded-3xl text-center text-slate-300 font-bold">目前無題目</div> : questions.map((q, idx) => (
           <div key={q.id} className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden text-left">
             <div className="flex justify-between items-center mb-4 text-left">
-              <span className="text-[0.6rem] font-black text-indigo-500 uppercase tracking-[0.2em] text-indigo-600">Question {idx + 1} • {q.points} Pts</span>
+              <span className="text-[0.6rem] font-black text-indigo-500 uppercase tracking-[0.2em]">Question {idx + 1} • {q.points} Pts</span>
               <span className={`text-[0.6rem] font-black px-2 py-1 rounded-lg ${q.type === 'choice' ? 'bg-blue-50 text-blue-500' : q.type === 'multiple' ? 'bg-orange-50 text-orange-500' : 'bg-purple-50 text-purple-500'}`}>
                 {q.type === 'choice' ? '單選題' : q.type === 'multiple' ? '複選題' : '填空題'}
               </span>
@@ -271,7 +271,7 @@ const AdminLoginView = memo(({ onBack, onLogin }) => {
 });
 
 // --- 3. 助教編輯題目 Modal ---
-const AdminEditQuestionModal = memo(({ editingQ, setEditingQ, saveQuestion }) => {
+const AdminEditQuestionModal = memo(({ editingQ, setEditingQ, saveQuestion, user }) => {
   const [localQ, setLocalQ] = useState(editingQ);
   const [isUploading, setIsUploading] = useState(false);
   const questionRef = useRef(null);
@@ -285,15 +285,20 @@ const AdminEditQuestionModal = memo(({ editingQ, setEditingQ, saveQuestion }) =>
     return { ...prev, options: opts };
   });
 
+  // 重要修正：確保上傳前已登入並處理 Firebase Storage 邏輯
   const uploadImageAndInsert = async (file, targetRef, field, optionIdx = -1) => {
     if (!file || !file.type.startsWith('image/')) return;
+    if (!user) {
+        alert("尚未登入，無法上傳圖片。");
+        return;
+    }
     
     setIsUploading(true);
     try {
-      const fileName = `exam-assets/${appId}/${Date.now()}-${file.name}`;
+      const fileName = `artifacts/${appId}/public/assets/${Date.now()}-${file.name}`;
       const imageRef = ref(storage, fileName);
-      await uploadBytes(imageRef, file);
-      const url = await getDownloadURL(imageRef);
+      const snapshot = await uploadBytes(imageRef, file);
+      const url = await getDownloadURL(snapshot.ref);
       
       const el = targetRef.current;
       const start = el.selectionStart;
@@ -309,7 +314,7 @@ const AdminEditQuestionModal = memo(({ editingQ, setEditingQ, saveQuestion }) =>
       }
     } catch (error) {
       console.error("Image upload failed:", error);
-      alert("圖片上傳失敗，請檢查網路連線。");
+      alert("圖片上傳失敗。請確保已設定 Storage 儲存桶權限。");
     } finally {
       setIsUploading(false);
     }
@@ -540,7 +545,7 @@ const AdminDashboard = memo(({ records, exams, questions, onBack, onTestExam, ap
   };
 
   const saveManualGrades = async () => {
-    if (!viewingRecord) return;
+    if (!viewingRecord || !user) return;
     let newFillScore = 0;
     const updatedAnswers = viewingRecord.answers.map(a => {
       const g = gradingAnswers.find(ga => ga.qId === a.qId);
@@ -643,7 +648,6 @@ const AdminDashboard = memo(({ records, exams, questions, onBack, onTestExam, ap
         )}
       </div>
 
-      {/* --- 全局 事後通知 (Toast) --- */}
       {toast.show && (
         <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] animate-bounce text-white">
           <div className="bg-green-600 text-white px-8 py-4 rounded-full shadow-2xl flex items-center gap-3 border border-white/20 backdrop-blur-md">
@@ -653,8 +657,6 @@ const AdminDashboard = memo(({ records, exams, questions, onBack, onTestExam, ap
         </div>
       )}
 
-      {/* --- 全局 Modals --- */}
-      
       {viewingRecord && (
         <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-xl z-[60] flex items-center justify-center p-4 text-slate-800 text-left">
           <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col text-left border border-white/10">
@@ -695,14 +697,15 @@ const AdminDashboard = memo(({ records, exams, questions, onBack, onTestExam, ap
         <AdminEditQuestionModal 
           editingQ={editingQ} 
           setEditingQ={setEditingQ} 
-          saveQuestion={saveQuestion} 
+          saveQuestion={saveQuestion}
+          user={user}
         />
       )}
     </div>
   );
 });
 
-// --- 5. 主應用導航器 ---
+// --- 5. 主應用 ---
 
 const App = () => {
   const [user, setUser] = useState(null);
@@ -720,6 +723,7 @@ const App = () => {
 
   const stateRef = useRef({ questions, currentAnswers, studentInfo, view, isTestMode, activeExam });
   
+  // 初始化外部函式庫 (Tailwind, MathJax)
   useEffect(() => {
     if (!document.getElementById('tailwind-cdn')) {
       const script = document.createElement('script');
@@ -741,14 +745,19 @@ const App = () => {
     stateRef.current = { questions, currentAnswers, studentInfo, view, isTestMode, activeExam };
   }, [questions, currentAnswers, studentInfo, view, isTestMode, activeExam]);
 
+  // 身分驗證與資料監聽 (遵從 Rule 3: 先 Auth 後 Query)
   useEffect(() => {
     const initAuth = async () => {
       try {
         if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-          try { await signInWithCustomToken(auth, __initial_auth_token); } 
-          catch { await signInAnonymously(auth); }
-        } else { await signInAnonymously(auth); }
-      } catch (err) { console.error("Auth error:", err); }
+          await signInWithCustomToken(auth, __initial_auth_token);
+        } else {
+          await signInAnonymously(auth);
+        }
+      } catch (err) {
+        console.error("Auth init failed, retrying anonymous:", err);
+        await signInAnonymously(auth).catch(e => console.error("Critical Auth Error", e));
+      }
     };
     initAuth();
     const unsubscribe = onAuthStateChanged(auth, setUser);
@@ -757,20 +766,22 @@ const App = () => {
 
   useEffect(() => {
     if (!user) return;
+    
+    // 遵從 Rule 1: 存取 /artifacts/{appId}/public/data/ 下的 Collection
     const unsubExams = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'exams'), (snapshot) => {
       const loaded = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setExams(loaded);
       setActiveExam(loaded.find(e => e.isActive) || null);
-    }, (err) => console.error(err));
+    }, (err) => console.error("Firestore exams error:", err));
 
     const unsubQ = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'questions'), (snapshot) => {
       setQuestions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setIsLoading(false);
-    }, (err) => console.error(err));
+    }, (err) => console.error("Firestore questions error:", err));
 
     const unsubR = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'records'), (snapshot) => {
       setRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => console.error(err));
+    }, (err) => console.error("Firestore records error:", err));
 
     return () => { unsubExams(); unsubQ(); unsubR(); };
   }, [user]);
@@ -802,7 +813,6 @@ const App = () => {
     const graded = examQs.map(q => {
       const studentRaw = String(ans[q.id] || '').trim().replace(/,/g, '').toUpperCase();
       const studentSorted = studentRaw.split('').sort().join('');
-      
       const correctRaw = String(q.answer || '').trim().replace(/,/g, '').toUpperCase();
       const correctSorted = correctRaw.split('').sort().join('');
 
@@ -810,42 +820,21 @@ const App = () => {
         const isCorrect = studentSorted === correctSorted && studentSorted !== "";
         if (isCorrect) choiceScore += q.points;
         return { 
-          qId: q.id, 
-          qText: q.text, 
-          type: q.type, 
-          correctAns: q.answer, 
-          studentAns: ans[q.id] || '', 
-          isCorrect, 
-          points: q.points, 
-          earnedPoints: isCorrect ? q.points : 0 
+          qId: q.id, qText: q.text, type: q.type, correctAns: q.answer, 
+          studentAns: ans[q.id] || '', isCorrect, points: q.points, earnedPoints: isCorrect ? q.points : 0 
         };
       } else {
         return { 
-          qId: q.id, 
-          qText: q.text, 
-          type: q.type, 
-          correctAns: q.answer, 
-          studentAns: ans[q.id] || '', 
-          isCorrect: false, 
-          points: q.points, 
-          earnedPoints: 0, 
-          isManuallyGraded: false 
+          qId: q.id, qText: q.text, type: q.type, correctAns: q.answer, 
+          studentAns: ans[q.id] || '', isCorrect: false, points: q.points, earnedPoints: 0, isManuallyGraded: false 
         };
       }
     });
 
     const record = { 
-      examId: ae.id, 
-      examTitle: ae.title, 
-      studentId: si.id || "TESTER", 
-      studentName: si.name || "測試模式", 
-      choiceScore, 
-      fillScore: 0, 
-      totalScore: choiceScore, 
-      score: choiceScore, 
-      answers: graded, 
-      timestamp: new Date().toISOString(), 
-      isTerminated: isForced 
+      examId: ae.id, examTitle: ae.title, studentId: si.id || "TESTER", studentName: si.name || "測試模式", 
+      choiceScore, fillScore: 0, totalScore: choiceScore, score: choiceScore, answers: graded, 
+      timestamp: new Date().toISOString(), isTerminated: isForced 
     };
 
     if (tm) { setExamResult(record); setView('result'); return; }

@@ -17,33 +17,45 @@ import {
   Sigma, Terminal, Square, CheckSquare, Superscript, Subscript, Image as ImageIcon, Loader2
 } from 'lucide-react';
 
-// --- Firebase 初始化 (優先使用環境變數) ---
+// --- Firebase 配置 (使用您提供的資訊) ---
+const myFirebaseConfig = {
+  apiKey: "AIzaSyCL6ikY2ZO8JRMqDBguEMa59kX2-is6GpU",
+  authDomain: "ds-final-exam.firebaseapp.com",
+  projectId: "ds-final-exam",
+  storageBucket: "ds-final-exam.firebasestorage.app",
+  messagingSenderId: "1090141287700",
+  appId: "1:1090141287700:web:07038a72f4a972e4c63e01",
+  measurementId: "G-T7K56Q5Z51"
+};
+
+// 優先嘗試從環境讀取，若無則使用上面的硬編碼配置
 const getFirebaseConfig = () => {
   try {
     if (typeof __firebase_config !== 'undefined' && __firebase_config) {
       return JSON.parse(__firebase_config);
     }
-  } catch (e) {
-    console.error("Firebase config parse error", e);
-  }
-  return { apiKey: "", authDomain: "", projectId: "", storageBucket: "", messagingSenderId: "", appId: "" };
+  } catch (e) {}
+  return myFirebaseConfig;
 };
 
 const firebaseConfig = getFirebaseConfig();
-const appId = typeof __app_id !== 'undefined' ? __app_id : 'ds-final-exam-pro';
+// 確保 appId 與您的 Firebase Rule 路徑完全對應
+const appId = 'ds-final-exam-pro'; 
 
-// 全局變數定義，避免初始化失敗導致崩潰
-let app, auth, db, storage;
+let firebaseApp, auth, db, storage;
+let initError = null;
+
 try {
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-  storage = getStorage(app);
+  firebaseApp = initializeApp(firebaseConfig);
+  auth = getAuth(firebaseApp);
+  db = getFirestore(firebaseApp);
+  storage = getStorage(firebaseApp);
 } catch (e) {
-  console.error("Firebase init failed", e);
+  initError = e.message;
+  console.error("Firebase initialization failed:", e);
 }
 
-// --- 1. 格式化渲染組件 ---
+// --- 1. 格式化渲染組件 (支援 LaTeX, 圖片) ---
 const FormattedText = memo(({ content, className = "" }) => {
   const containerRef = useRef(null);
 
@@ -86,7 +98,7 @@ const FormattedText = memo(({ content, className = "" }) => {
   );
 });
 
-// --- 2. 各視圖組件 ---
+// --- 2. 視圖組件 ---
 
 const LandingView = memo(({ onStart, activeExam, onAdminLogin }) => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 p-4 text-white font-sans">
@@ -185,12 +197,6 @@ const StudentExamView = memo(({ questions, studentInfo, currentAnswers, setCurre
         </div>
       </header>
       <main className="max-w-3xl mx-auto p-4 py-8 space-y-8 text-left">
-        {!isTestMode && (
-          <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex items-start gap-3 text-amber-800 text-xs font-bold shadow-sm">
-            <AlertTriangle className="shrink-0" size={18} />
-            <div>防作弊模式已啟動。切換分頁或離開焦點將視為強制交卷。</div>
-          </div>
-        )}
         {questions.length === 0 ? <div className="bg-white p-20 rounded-3xl text-center text-slate-300 font-bold">目前無題目</div> : questions.map((q, idx) => (
           <div key={q.id} className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden">
             <div className="flex justify-between items-center mb-4">
@@ -234,27 +240,6 @@ const StudentExamView = memo(({ questions, studentInfo, currentAnswers, setCurre
   );
 });
 
-const ResultView = memo(({ examResult, isTestMode, onBack }) => (
-  <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4 font-sans text-slate-800 text-center">
-    <div className="bg-white p-10 rounded-[3rem] shadow-2xl w-full max-lg border border-slate-100 flex flex-col items-center">
-      <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-8 shadow-inner ${examResult?.isTerminated ? 'bg-red-100 text-red-600 shadow-red-200' : 'bg-green-100 text-green-600 shadow-green-200'}`}>
-        {examResult?.isTerminated ? <AlertTriangle size={48} /> : <CheckCircle2 size={48} />}
-      </div>
-      <h2 className={`text-3xl font-black mb-2 tracking-tight ${examResult?.isTerminated ? 'text-red-600' : 'text-slate-800'}`}>{isTestMode ? "測試完成" : (examResult?.isTerminated ? '測驗被強制終止' : '測驗已結束')}</h2>
-      <p className="text-slate-400 font-medium mb-12 leading-relaxed">
-        {isTestMode ? "模擬環境不儲存紀錄。" : "成績已存檔。選擇題已自動對分，填空題將由助教人工核閱。"}
-      </p>
-      <div className={`w-full bg-gradient-to-br p-10 rounded-[2.5rem] mb-10 shadow-xl text-white ${isTestMode ? 'from-amber-500 to-amber-700' : (examResult?.isTerminated ? 'from-red-500 to-red-700' : 'from-slate-800 to-slate-900')}`}>
-        <span className="text-[0.7rem] font-black uppercase tracking-[0.3em] opacity-60 mb-2 block text-white/80">Choice Score (選擇得分)</span>
-        <div className="text-8xl font-black mb-4 tracking-tighter">{examResult?.choiceScore ?? examResult?.score}</div>
-        <div className="h-px bg-white/20 w-16 mx-auto mb-4"></div>
-        <div className="text-white font-bold">{examResult?.studentId} {examResult?.studentName}</div>
-      </div>
-      <button onClick={onBack} className="text-indigo-600 font-black hover:bg-indigo-50 px-10 py-3 rounded-full transition">返回首頁</button>
-    </div>
-  </div>
-));
-
 const AdminLoginView = memo(({ onBack, onLogin }) => {
   const [pwd, setPwd] = useState("");
   return (
@@ -295,10 +280,7 @@ const AdminEditQuestionModal = memo(({ editingQ, setEditingQ, saveQuestion, user
 
   const uploadImageAndInsert = async (file, targetRef, field, optionIdx = -1) => {
     if (!file || !file.type.startsWith('image/')) return;
-    if (!user) {
-        alert("尚未登入，無法上傳圖片。");
-        return;
-    }
+    if (!user) { alert("尚未登入，無法上傳圖片。"); return; }
     
     setIsUploading(true);
     try {
@@ -321,7 +303,7 @@ const AdminEditQuestionModal = memo(({ editingQ, setEditingQ, saveQuestion, user
       }
     } catch (error) {
       console.error("Image upload failed:", error);
-      alert("圖片上傳失敗。請確保已設定 Storage 權限。");
+      alert("圖片上傳失敗。請確保 Storage Rules 已開啟。");
     } finally {
       setIsUploading(false);
     }
@@ -355,12 +337,6 @@ const AdminEditQuestionModal = memo(({ editingQ, setEditingQ, saveQuestion, user
     } else if (type === 'code') {
       newText = text.substring(0, start) + '\n```\n' + selectedText + '\n```\n' + text.substring(end);
       offset = 5;
-    } else if (type === 'sup') {
-      newText = text.substring(0, start) + '^{' + selectedText + '}' + text.substring(end);
-      offset = 2;
-    } else if (type === 'sub') {
-      newText = text.substring(0, start) + '_{' + selectedText + '}' + text.substring(end);
-      offset = 2;
     }
 
     if (optionIdx !== -1) {
@@ -375,15 +351,6 @@ const AdminEditQuestionModal = memo(({ editingQ, setEditingQ, saveQuestion, user
     }, 0);
   };
 
-  const EditorToolbar = ({ targetRef, field, optionIdx }) => (
-    <div className="flex flex-wrap gap-2 mb-2">
-      <button type="button" onClick={() => insertFormat(targetRef, 'latex', field, optionIdx)} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-lg text-[0.65rem] font-black border border-indigo-100 hover:bg-indigo-100"><Sigma size={14} /> 數學公式</button>
-      <button type="button" onClick={() => insertFormat(targetRef, 'sup', field, optionIdx)} className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-[0.65rem] font-black border border-blue-100 hover:bg-blue-100"><Superscript size={14} /> 上標</button>
-      <button type="button" onClick={() => insertFormat(targetRef, 'sub', field, optionIdx)} className="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-50 text-cyan-600 rounded-lg text-[0.65rem] font-black border border-cyan-100 hover:bg-cyan-100"><Subscript size={14} /> 下標</button>
-      <button type="button" onClick={() => insertFormat(targetRef, 'code', field, optionIdx)} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-600 rounded-lg text-[0.65rem] font-black border border-slate-200 hover:bg-slate-200"><Terminal size={14} /> 程式碼</button>
-    </div>
-  );
-
   return (
     <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4 font-sans text-slate-800">
       <div className="bg-white rounded-[3rem] w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl border border-white/20">
@@ -391,11 +358,14 @@ const AdminEditQuestionModal = memo(({ editingQ, setEditingQ, saveQuestion, user
           <div className="flex items-center gap-3"><div className="bg-indigo-600 p-2 rounded-xl text-white"><Settings size={20}/></div><h3 className="text-xl font-black">考題編輯</h3></div>
           <button onClick={() => setEditingQ(null)} className="p-2 hover:text-red-500 transition-colors text-slate-400"><X size={32}/></button>
         </div>
-        <div className="flex flex-col lg:flex-row overflow-hidden flex-1">
+        <div className="flex flex-col lg:flex-row overflow-hidden flex-1 text-left">
           <form onSubmit={(e) => { e.preventDefault(); saveQuestion(new FormData(e.target)); }} className="p-8 space-y-6 overflow-y-auto lg:w-1/2 border-r border-slate-100">
             <div>
-              <label className="block text-[0.65rem] font-black text-slate-400 mb-2 uppercase ml-1">題目內容</label>
-              <EditorToolbar targetRef={questionRef} field="text" />
+              <label className="block text-[0.65rem] font-black text-slate-400 mb-2 uppercase">題目內容</label>
+              <div className="flex gap-2 mb-2">
+                <button type="button" onClick={() => insertFormat(questionRef, 'latex', 'text')} className="px-3 py-1 bg-indigo-50 text-indigo-600 rounded-lg text-xs font-black">插入公式</button>
+                <button type="button" onClick={() => insertFormat(questionRef, 'code', 'text')} className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-xs font-black">插入程式碼</button>
+              </div>
               <textarea 
                 ref={questionRef}
                 name="text" 
@@ -403,13 +373,12 @@ const AdminEditQuestionModal = memo(({ editingQ, setEditingQ, saveQuestion, user
                 onChange={(e) => handleUpdate('text', e.target.value)} 
                 onPaste={(e) => handlePaste(e, questionRef, 'text')}
                 required 
-                placeholder="在此輸入題目內容... 支援 LaTeX 與 圖片貼上"
                 className="w-full p-5 bg-slate-50 rounded-2xl h-48 outline-none font-mono text-sm focus:bg-white border-2 border-transparent focus:border-indigo-600 shadow-inner"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div><label className="block text-[0.65rem] font-black text-slate-400 mb-2 uppercase">題型</label>
-              <select name="type" value={localQ.type} onChange={(e) => handleUpdate('type', e.target.value)} className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-none outline-none shadow-inner">
+              <select name="type" value={localQ.type} onChange={(e) => handleUpdate('type', e.target.value)} className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-none outline-none">
                 <option value="choice">單選題</option>
                 <option value="multiple">複選題</option>
                 <option value="fill">填空題</option>
@@ -422,22 +391,18 @@ const AdminEditQuestionModal = memo(({ editingQ, setEditingQ, saveQuestion, user
             
             {(localQ.type === 'choice' || localQ.type === 'multiple') && (
               <div className="space-y-4">
-                <label className="block text-[0.65rem] font-black text-slate-400 uppercase">選項編輯</label>
                 {['A', 'B', 'C', 'D'].map((lab, i) => (
                   <div key={lab} className="flex gap-2 items-start">
                     <span className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-xs font-black shrink-0 mt-1">{lab}</span>
-                    <div className="flex-1">
-                      <EditorToolbar targetRef={optionRefs[i]} field={`opt${lab}`} optionIdx={i} />
-                      <textarea 
-                        ref={optionRefs[i]}
-                        name={`opt${lab}`} 
-                        value={localQ.options[i]} 
-                        placeholder={`選項 ${lab} 內容...`} 
-                        onChange={(e) => handleOptionUpdate(i, e.target.value)} 
-                        onPaste={(e) => handlePaste(e, optionRefs[i], `opt${lab}`, i)}
-                        className="w-full p-3 bg-slate-50 rounded-xl border-none outline-none focus:ring-2 focus:ring-indigo-600 font-mono text-xs min-h-[60px] shadow-sm" 
-                      />
-                    </div>
+                    <textarea 
+                      ref={optionRefs[i]}
+                      name={`opt${lab}`} 
+                      value={localQ.options[i]} 
+                      onChange={(e) => handleOptionUpdate(i, e.target.value)} 
+                      onPaste={(e) => handlePaste(e, optionRefs[i], `opt${lab}`, i)}
+                      placeholder={`選項 ${lab}`}
+                      className="flex-1 w-full p-3 bg-slate-50 rounded-xl border-none outline-none focus:ring-2 focus:ring-indigo-600 font-mono text-xs min-h-[60px] shadow-sm" 
+                    />
                   </div>
                 ))}
               </div>
@@ -445,11 +410,9 @@ const AdminEditQuestionModal = memo(({ editingQ, setEditingQ, saveQuestion, user
             <div className="flex gap-4 pt-4"><button type="submit" className="flex-1 bg-slate-900 text-white py-5 rounded-2xl font-black shadow-lg">儲存題目</button>
             <button type="button" onClick={() => setEditingQ(null)} className="flex-1 bg-slate-100 text-slate-600 py-5 rounded-2xl font-black">取消</button></div>
           </form>
-          <div className="p-8 lg:w-1/2 bg-slate-50/50 overflow-y-auto flex flex-col">
-            <h4 className="text-[0.6rem] font-black text-indigo-500 uppercase tracking-[0.2em] mb-6 flex items-center gap-2"><Eye size={14}/> 考生視角預覽</h4>
-            <div className="space-y-6 flex-1">
-              <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100"><FormattedText content={localQ.text || "等待輸入..."} className="text-base" /></div>
-            </div>
+          <div className="p-8 lg:w-1/2 bg-slate-50/50 overflow-y-auto">
+            <h4 className="text-[0.6rem] font-black text-indigo-500 uppercase tracking-[0.2em] mb-6 flex items-center gap-2"><Eye size={14}/> 考生預覽</h4>
+            <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100"><FormattedText content={localQ.text || "等待輸入..."} className="text-base" /></div>
           </div>
         </div>
       </div>
@@ -463,9 +426,6 @@ const AdminDashboard = memo(({ records, exams, questions, onBack, onTestExam, ap
   const [editingExam, setEditingExam] = useState(null);
   const [editingQ, setEditingQ] = useState(null);
   const [selectedExamId, setSelectedExamId] = useState(null);
-  const [viewingRecord, setViewingRecord] = useState(null);
-  const [gradingAnswers, setGradingAnswers] = useState([]);
-  const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '' });
 
   const showToast = useCallback((msg) => {
@@ -493,8 +453,21 @@ const AdminDashboard = memo(({ records, exams, questions, onBack, onTestExam, ap
     } catch (e) { alert("題目儲存失敗"); }
   };
 
+  const saveExam = async (e) => {
+    e.preventDefault();
+    const title = new FormData(e.target).get('title');
+    try {
+      if (editingExam.id === 'new') {
+        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'exams'), { title, isActive: false });
+      } else {
+        await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exams', editingExam.id), { title });
+      }
+      setEditingExam(null);
+    } catch (e) { alert("儲存考卷失敗"); }
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col font-sans pb-20">
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans pb-20 text-left">
       <nav className="bg-slate-900 text-white p-4 px-8 flex justify-between items-center sticky top-0 z-40 shadow-xl">
         <div className="font-black text-xl flex items-center gap-3"><div className="bg-indigo-500 p-2 rounded-xl"><ShieldCheck size={20} /></div>助教控制中心</div>
         <button onClick={onBack} className="p-2 hover:bg-white/10 rounded-xl transition text-slate-400"><LogOut /></button>
@@ -509,13 +482,10 @@ const AdminDashboard = memo(({ records, exams, questions, onBack, onTestExam, ap
 
         {tab === 'records' && (
           <div className="bg-white rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden text-slate-800">
-            <div className="p-6 border-b flex flex-col sm:flex-row justify-between items-center gap-4 bg-slate-50/50">
-              <h3 className="font-black text-xl">考生測驗數據</h3>
-            </div>
-            <div className="overflow-x-auto"><table className="w-full text-left border-collapse"><thead className="bg-slate-50 border-b text-[0.6rem] font-black text-slate-400 uppercase tracking-widest text-left"><tr><th className="p-6">姓名 / 學號</th><th>選擇分</th><th>填空分</th><th className="text-center">總分</th></tr></thead>
+            <div className="overflow-x-auto"><table className="w-full text-left border-collapse"><thead className="bg-slate-50 border-b text-[0.6rem] font-black text-slate-400 uppercase tracking-widest text-left"><tr><th className="p-6">姓名 / 學號</th><th>選擇分</th><th>總分</th></tr></thead>
               <tbody className="divide-y divide-slate-100">{records.map(r => (
-                <tr key={r.id} className="hover:bg-slate-50 transition text-left"><td className="p-6 font-black">{r.studentName}<div className="font-mono text-[0.6rem] text-indigo-500">{r.studentId}</div></td>
-                <td className="font-bold text-slate-500">{r.choiceScore ?? r.score}</td><td className="font-bold text-indigo-600">{r.fillScore ?? 0}</td><td className="text-center font-black">{r.totalScore ?? r.score}</td></tr>
+                <tr key={r.id} className="hover:bg-slate-50 transition"><td className="p-6 font-black">{r.studentName}<div className="font-mono text-[0.6rem] text-indigo-500">{r.studentId}</div></td>
+                <td className="font-bold text-slate-500">{r.choiceScore ?? r.score}</td><td className="font-black">{r.totalScore ?? r.score}</td></tr>
               ))}</tbody></table></div>
           </div>
         )}
@@ -523,14 +493,73 @@ const AdminDashboard = memo(({ records, exams, questions, onBack, onTestExam, ap
         {tab === 'exams' && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {exams.map(e => (
-              <div key={e.id} className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100">
-                <h4 className="text-2xl font-black text-slate-800 mb-6">{e.title}</h4>
-                <div className="flex gap-3"><button onClick={() => onTestExam(e)} className="px-6 py-3 rounded-2xl bg-slate-900 text-white font-black text-xs flex items-center justify-center gap-2 hover:bg-black transition"><PlayCircle size={16}/> 測試</button></div>
+              <div key={e.id} className="bg-white p-8 rounded-[2.5rem] border-2 border-slate-100 flex flex-col justify-between">
+                <div>
+                    <div className="flex justify-between items-center mb-4">
+                        <span className={`px-3 py-1 rounded-full text-[0.6rem] font-black uppercase ${e.isActive ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-400'}`}>{e.isActive ? '開放中' : '關閉中'}</span>
+                        <div className="flex gap-2">
+                            <button onClick={() => setEditingExam(e)} className="p-2 hover:text-indigo-600 transition"><Edit3 size={18}/></button>
+                            <button onClick={async () => { if(confirm('刪除考卷？')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exams', e.id)); }} className="p-2 hover:text-red-600 transition"><Trash2 size={18}/></button>
+                        </div>
+                    </div>
+                    <h4 className="text-2xl font-black text-slate-800 mb-6">{e.title}</h4>
+                </div>
+                <div className="flex gap-3 pt-4 border-t border-slate-50">
+                    <button onClick={async () => { const all = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'exams')); for(let d of all.docs) await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exams', d.id), { isActive: false }); await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'exams', e.id), { isActive: !e.isActive }); }} className={`flex-1 py-3 rounded-2xl font-black text-xs ${e.isActive ? 'bg-slate-100 text-slate-600' : 'bg-green-600 text-white'}`}>{e.isActive ? '關閉測驗' : '啟動正式測驗'}</button>
+                    <button onClick={() => onTestExam(e)} className="px-6 py-3 rounded-2xl bg-slate-900 text-white font-black text-xs flex items-center justify-center gap-2 hover:bg-black transition"><PlayCircle size={16}/> 測試</button>
+                </div>
               </div>
             ))}
+            <button onClick={() => setEditingExam({ id: 'new', title: '' })} className="h-full min-h-[150px] border-2 border-dashed border-slate-200 rounded-[2.5rem] flex flex-col items-center justify-center gap-2 text-slate-400 hover:border-indigo-500 hover:text-indigo-500 transition"><Plus size={32}/><span className="font-black text-sm">建立新考卷</span></button>
+          </div>
+        )}
+
+        {tab === 'questions' && (
+          <div className="space-y-6">
+            <div className="flex flex-col md:flex-row justify-between gap-4 bg-white p-6 rounded-[2.5rem] shadow-sm border border-slate-200">
+              <div className="flex-1">
+                <label className="block text-[0.6rem] font-black text-slate-400 uppercase mb-2">管理考卷題目</label>
+                <select className="w-full md:w-80 p-4 bg-slate-50 rounded-2xl font-black text-slate-700 outline-none" value={selectedExamId || ''} onChange={(e) => setSelectedExamId(e.target.value)}>
+                    <option value="">-- 選取考卷 --</option>
+                    {exams.map(e => <option key={e.id} value={e.id}>{e.title}</option>)}
+                </select>
+              </div>
+              {selectedExamId && <button onClick={() => setEditingQ({ id: 'new', type: 'choice', text: '', answer: 'A', points: 4, options: ['', '', '', ''] })} className="bg-indigo-600 text-white px-8 py-4 rounded-2xl flex items-center justify-center gap-2 font-black shadow-lg hover:bg-indigo-700 transition"><Plus size={20} /> 新增題目</button>}
+            </div>
+            <div className="grid grid-cols-1 gap-6">
+                {selectedExamId && questions.filter(q => q.examId === selectedExamId).map((q, idx) => (
+                    <div key={q.id} className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 flex flex-col md:flex-row gap-6">
+                        <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-4">
+                                <span className="bg-slate-100 text-slate-400 px-3 py-1 rounded-xl text-xs font-black uppercase">Q {idx+1}</span>
+                                <span className="text-indigo-600 font-black text-xs">{q.points} Pts</span>
+                            </div>
+                            <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100"><FormattedText content={q.text} className="text-sm text-slate-700" /></div>
+                        </div>
+                        <div className="flex md:flex-col gap-2 shrink-0">
+                            <button onClick={() => setEditingQ(q)} className="p-4 bg-slate-50 text-indigo-500 hover:bg-indigo-500 hover:text-white rounded-2xl transition"><Edit3 size={20}/></button>
+                            <button onClick={async () => { if(confirm('刪除題目？')) await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'questions', q.id)); }} className="p-4 bg-slate-50 text-red-500 hover:bg-red-500 hover:text-white rounded-2xl transition"><Trash2 size={20}/></button>
+                        </div>
+                    </div>
+                ))}
+            </div>
           </div>
         )}
       </div>
+
+      {editingExam && (
+        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2.5rem] p-10 w-full max-w-md shadow-2xl">
+            <h3 className="text-xl font-black mb-8 text-center">考卷設定</h3>
+            <form onSubmit={saveExam} className="space-y-6">
+              <div><label className="text-[0.65rem] font-black text-slate-400 mb-2 block uppercase ml-1">標題名稱</label>
+              <input name="title" defaultValue={editingExam.title} required className="w-full p-5 bg-slate-50 rounded-2xl font-bold outline-none focus:ring-2 focus:ring-indigo-600 transition-all text-slate-700" /></div>
+              <div className="flex gap-4"><button type="submit" className="flex-1 bg-slate-900 text-white py-4 rounded-xl font-black">確認</button>
+              <button type="button" onClick={() => setEditingExam(null)} className="flex-1 bg-slate-100 py-4 rounded-xl font-black text-slate-600">取消</button></div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {editingQ && <AdminEditQuestionModal editingQ={editingQ} setEditingQ={setEditingQ} saveQuestion={saveQuestion} user={user} />}
     </div>
@@ -552,13 +581,13 @@ const App = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isChecking, setIsChecking] = useState(false);
   const [isTestMode, setIsTestMode] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState(initError);
 
   // 安全超時：避免白屏
   useEffect(() => {
     const timer = setTimeout(() => {
       if (isLoading) {
-        console.warn("Loading took too long, forcing start.");
+        console.warn("Loading timeout, forcing view.");
         setIsLoading(false);
       }
     }, 5000);
@@ -583,7 +612,7 @@ const App = () => {
   // 身分驗證 (Rule 3)
   useEffect(() => {
     if (!auth) {
-        setError("Firebase 未能正確初始化。請檢查 API 金鑰。");
+        setError("Firebase 初始化失敗。請檢查您的金鑰配置。");
         setIsLoading(false);
         return;
     }
@@ -596,7 +625,7 @@ const App = () => {
           await signInAnonymously(auth);
         }
       } catch (err) {
-        console.error("Auth init failed", err);
+        console.error("Auth init error", err);
         await signInAnonymously(auth).catch(() => {});
       }
     };
@@ -604,7 +633,6 @@ const App = () => {
     
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
-      // 一旦確定了登入狀態，就可以考慮關閉初始載入
       if (u) setIsLoading(false);
     });
     return () => unsubscribe();
@@ -618,15 +646,15 @@ const App = () => {
       const loaded = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setExams(loaded);
       setActiveExam(loaded.find(e => e.isActive) || null);
-    }, (err) => console.error("Exams error:", err));
+    }, (err) => console.error("Firestore error (exams):", err));
 
     const unsubQ = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'questions'), (snapshot) => {
       setQuestions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => console.error("Questions error:", err));
+    }, (err) => console.error("Firestore error (questions):", err));
 
     const unsubR = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'records'), (snapshot) => {
       setRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (err) => console.error("Records error:", err));
+    }, (err) => console.error("Firestore error (records):", err));
 
     return () => { unsubExams(); unsubQ(); unsubR(); };
   }, [user]);
@@ -679,7 +707,7 @@ const App = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 font-sans p-6 text-center">
         <Loader2 className="animate-spin text-indigo-600 mb-4" size={48} />
-        <p className="text-slate-500 font-bold">正在連線至雲端伺服器...</p>
+        <p className="text-slate-500 font-bold tracking-tight uppercase text-xs">正在建立安全連線...</p>
       </div>
     );
   }
@@ -688,8 +716,8 @@ const App = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 font-sans p-6 text-center">
         <AlertTriangle className="text-red-500 mb-4" size={64} />
-        <h2 className="text-2xl font-black mb-2">系統連線失敗</h2>
-        <p className="text-slate-500 max-w-sm">{error}</p>
+        <h2 className="text-2xl font-black mb-2 tracking-tight">連線錯誤</h2>
+        <p className="text-slate-500 max-w-sm text-sm">{error}</p>
       </div>
     );
   }

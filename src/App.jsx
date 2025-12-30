@@ -72,7 +72,7 @@ const LandingView = memo(({ onStart, activeExam, onAdminLogin }) => (
   <div className="min-h-screen flex flex-col items-center justify-center bg-slate-900 p-4 text-white font-sans text-center">
     <div className="bg-white/5 p-10 rounded-[3rem] backdrop-blur-xl border border-white/10 flex flex-col items-center shadow-2xl max-w-sm w-full">
       <div className="bg-indigo-600 p-4 rounded-3xl mb-6 shadow-xl shadow-indigo-500/30 flex items-center justify-center text-white"><BookOpen size={48} /></div>
-      <h1 className="text-3xl font-black mb-2 tracking-tighter text-white">Minar測驗系統</h1>
+      <h1 className="text-3xl font-black mb-2 tracking-tighter text-white">資料結構測驗系統</h1>
       <div className="mb-8 px-4 py-1.5 bg-green-500/20 text-green-400 rounded-full text-[0.65rem] font-black uppercase tracking-widest border border-green-500/30">
         {activeExam ? `當前開放：${activeExam.title}` : "目前暫無開放測驗"}
       </div>

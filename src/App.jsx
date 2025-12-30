@@ -404,7 +404,7 @@ const AdminDashboard = ({ records, questions, onBack, appId }) => {
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col font-sans text-left">
       <nav className="bg-slate-900 text-white p-4 px-8 flex justify-between items-center sticky top-0 z-40">
-        <div className="font-black text-xl flex items-center gap-2"><ShieldCheck className="text-indigo-400" /> Exam Management</div>
+        <div className="font-black text-xl flex items-center gap-2"><ShieldCheck className="text-indigo-400" /> 資料結構考試</div>
         <button onClick={onBack} className="p-2 hover:bg-white/10 rounded-xl transition"><LogOut /></button>
       </nav>
 

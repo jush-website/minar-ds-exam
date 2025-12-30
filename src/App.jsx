@@ -11,7 +11,7 @@ import {
   User, ShieldCheck, ClipboardList, Settings, LogOut, 
   CheckCircle2, Trash2, Plus, Edit3, Eye, ArrowRight, Code, 
   AlertTriangle, PlayCircle, BookOpen, Layers, X, Check, FileDown, ArrowLeft, Save, InfoIcon, EyeIcon,
-  Sigma, Terminal
+  Sigma, Terminal, Square, CheckSquare
 } from 'lucide-react';
 
 // --- Firebase 配置 ---
@@ -120,6 +120,21 @@ const StudentExamView = memo(({ questions, studentInfo, currentAnswers, setCurre
     };
   }, [isTestMode, onSubmit]);
 
+  const toggleMultipleChoice = (qId, val) => {
+    setCurrentAnswers(prev => {
+      const current = prev[qId] || "";
+      let newAns;
+      if (current.includes(val)) {
+        newAns = current.replace(val, "");
+      } else {
+        newAns = current + val;
+      }
+      // 排序以方便後續比對
+      const sortedAns = newAns.split("").sort().join("");
+      return { ...prev, [qId]: sortedAns };
+    });
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 select-none pb-20 text-left font-sans">
       <header className={`border-b sticky top-0 z-30 p-4 flex justify-between items-center px-8 shadow-sm ${isTestMode ? 'bg-amber-500 text-white' : 'bg-white text-slate-800'}`}>
@@ -145,19 +160,27 @@ const StudentExamView = memo(({ questions, studentInfo, currentAnswers, setCurre
           <div key={q.id} className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 overflow-hidden text-left">
             <div className="flex justify-between items-center mb-4 text-left">
               <span className="text-[0.6rem] font-black text-indigo-500 uppercase tracking-[0.2em] text-indigo-600">Question {idx + 1} • {q.points} Pts</span>
-              <span className={`text-[0.6rem] font-black px-2 py-1 rounded-lg ${q.type === 'choice' ? 'bg-blue-50 text-blue-500' : 'bg-purple-50 text-purple-500'}`}>{q.type === 'choice' ? '選擇題' : '填空題'}</span>
+              <span className={`text-[0.6rem] font-black px-2 py-1 rounded-lg ${q.type === 'choice' ? 'bg-blue-50 text-blue-500' : q.type === 'multiple' ? 'bg-orange-50 text-orange-500' : 'bg-purple-50 text-purple-500'}`}>
+                {q.type === 'choice' ? '單選題' : q.type === 'multiple' ? '複選題' : '填空題'}
+              </span>
             </div>
             <div className="bg-slate-50 border border-slate-100 p-6 rounded-2xl mb-8">
               <FormattedText content={q.text} className="text-slate-800 text-base md:text-lg text-left" />
             </div>
-            {q.type === 'choice' ? (
+            {(q.type === 'choice' || q.type === 'multiple') ? (
               <div className="grid grid-cols-1 gap-3 text-left">
                 {q.options.map((opt, i) => {
                   const val = String.fromCharCode(65 + i);
-                  const active = currentAnswers[q.id] === val;
+                  const active = (currentAnswers[q.id] || "").includes(val);
+                  const handleClick = q.type === 'choice' 
+                    ? () => setCurrentAnswers(prev => ({...prev, [q.id]: val}))
+                    : () => toggleMultipleChoice(q.id, val);
+
                   return (
-                    <button key={i} onClick={() => setCurrentAnswers(prev => ({...prev, [q.id]: val}))} className={`w-full text-left p-5 rounded-2xl border-2 transition-all flex items-start gap-5 ${active ? 'border-indigo-600 bg-indigo-50 shadow-md ring-4 ring-indigo-500/10' : 'border-slate-50 hover:bg-slate-50 text-slate-600'}`}>
-                      <div className={`w-8 h-8 rounded-xl border-2 flex shrink-0 items-center justify-center font-black mt-0.5 ${active ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-200 text-slate-300'}`}>{val}</div>
+                    <button key={i} onClick={handleClick} className={`w-full text-left p-5 rounded-2xl border-2 transition-all flex items-start gap-5 ${active ? 'border-indigo-600 bg-indigo-50 shadow-md ring-4 ring-indigo-500/10' : 'border-slate-50 hover:bg-slate-50 text-slate-600'}`}>
+                      <div className={`w-8 h-8 rounded-xl border-2 flex shrink-0 items-center justify-center font-black mt-0.5 ${active ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-200 text-slate-300'}`}>
+                        {q.type === 'multiple' && active ? <Check size={16} /> : val}
+                      </div>
                       <FormattedText content={opt} className={`font-bold flex-1 ${active ? 'text-indigo-900' : 'text-slate-600'}`} />
                     </button>
                   );
@@ -309,14 +332,18 @@ const AdminEditQuestionModal = memo(({ editingQ, setEditingQ, saveQuestion }) =>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div><label className="block text-[0.65rem] font-black text-slate-400 mb-2 uppercase ml-1">題型</label>
-              <select name="type" value={localQ.type} onChange={(e) => handleUpdate('type', e.target.value)} className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-none outline-none shadow-inner text-slate-700 appearance-none cursor-pointer"><option value="choice">選擇題</option><option value="fill">填空題</option></select></div>
+              <select name="type" value={localQ.type} onChange={(e) => handleUpdate('type', e.target.value)} className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-none outline-none shadow-inner text-slate-700 appearance-none cursor-pointer">
+                <option value="choice">單選題</option>
+                <option value="multiple">複選題</option>
+                <option value="fill">填空題</option>
+              </select></div>
               <div><label className="block text-[0.65rem] font-black text-slate-400 mb-2 uppercase ml-1">配分</label>
               <input name="points" type="number" value={localQ.points} onChange={(e) => handleUpdate('points', e.target.value)} className="w-full p-4 bg-slate-50 rounded-2xl font-bold shadow-inner text-slate-700" /></div>
             </div>
-            <div><label className="block text-[0.65rem] font-black text-slate-400 mb-2 uppercase ml-1">解答參考</label>
+            <div><label className="block text-[0.65rem] font-black text-slate-400 mb-2 uppercase ml-1">解答參考 {localQ.type === 'multiple' ? '(如: AB 或 A,B)' : ''}</label>
             <textarea name="answer" value={localQ.answer} onChange={(e) => handleUpdate('answer', e.target.value)} required className="w-full p-4 bg-slate-50 rounded-2xl font-mono font-black text-indigo-600 shadow-inner min-h-[60px]"></textarea></div>
             
-            {localQ.type === 'choice' && (
+            {(localQ.type === 'choice' || localQ.type === 'multiple') && (
               <div className="space-y-4">
                 <label className="block text-[0.65rem] font-black text-slate-400 uppercase ml-1">選項編輯</label>
                 {['A', 'B', 'C', 'D'].map((lab, i) => (
@@ -344,9 +371,14 @@ const AdminEditQuestionModal = memo(({ editingQ, setEditingQ, saveQuestion }) =>
             <h4 className="text-[0.6rem] font-black text-indigo-500 uppercase tracking-[0.2em] mb-6 flex items-center gap-2 text-indigo-600"><Eye size={14}/> 考生視角預覽</h4>
             <div className="space-y-6 flex-1">
               <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100"><FormattedText content={localQ.text || "等待輸入..."} className="text-base text-slate-800" /></div>
-              {localQ.type === 'choice' ? (
+              {(localQ.type === 'choice' || localQ.type === 'multiple') ? (
                 <div className="space-y-3">{localQ.options.map((opt, i) => (
-                  <div key={i} className="bg-white p-4 rounded-2xl border border-slate-100 flex items-start gap-4"><div className="w-6 h-6 rounded-lg bg-slate-50 flex shrink-0 items-center justify-center text-[0.6rem] font-black text-slate-400 mt-1">{String.fromCharCode(65+i)}</div><FormattedText content={opt || "選項內容..."} className="text-sm text-slate-600 flex-1" /></div>
+                  <div key={i} className="bg-white p-4 rounded-2xl border border-slate-100 flex items-start gap-4">
+                    <div className="w-6 h-6 rounded-lg bg-slate-50 flex shrink-0 items-center justify-center text-[0.6rem] font-black text-slate-400 mt-1">
+                      {localQ.type === 'multiple' ? <Square size={12} /> : String.fromCharCode(65+i)}
+                    </div>
+                    <FormattedText content={opt || "選項內容..."} className="text-sm text-slate-600 flex-1" />
+                  </div>
                 ))}</div>
               ) : <div className="bg-indigo-50/50 p-6 rounded-3xl border-2 border-dashed border-indigo-100 text-indigo-300 font-black text-center italic text-sm">此處將顯示填空輸入框</div>}
             </div>
@@ -381,7 +413,7 @@ const AdminDashboard = memo(({ records, exams, questions, onBack, onTestExam, ap
       examId: selectedExamId, text: formData.get('text'),
       points: parseInt(formData.get('points')), answer: formData.get('answer'),
       type: formData.get('type'),
-      options: formData.get('type') === 'choice' ? [formData.get('optA'), formData.get('optB'), formData.get('optC'), formData.get('optD')] : []
+      options: (formData.get('type') === 'choice' || formData.get('type') === 'multiple') ? [formData.get('optA'), formData.get('optB'), formData.get('optC'), formData.get('optD')] : []
     };
     try {
       if (editingQ.id === 'new') {
@@ -498,9 +530,15 @@ const AdminDashboard = memo(({ records, exams, questions, onBack, onTestExam, ap
             </div>
             <div className="grid grid-cols-1 gap-6 text-left">{selectedExamId && questions.filter(q => q.examId === selectedExamId).map((q, idx) => (
               <div key={q.id} className="bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-200 flex flex-col md:flex-row gap-6 items-start text-left">
-                <div className="flex-1 w-full overflow-hidden text-left"><div className="flex items-center gap-3 mb-4 text-left"><span className="bg-slate-100 text-slate-400 px-3 py-1 rounded-xl text-xs font-black uppercase tracking-widest text-left">Q {idx+1}</span><span className="text-indigo-600 font-black text-xs underline underline-offset-4 text-left">{q.points} Pts</span></div>
+                <div className="flex-1 w-full overflow-hidden text-left"><div className="flex items-center gap-3 mb-4 text-left">
+                  <span className="bg-slate-100 text-slate-400 px-3 py-1 rounded-xl text-xs font-black uppercase tracking-widest text-left">Q {idx+1}</span>
+                  <span className={`px-3 py-1 rounded-xl text-[0.6rem] font-black uppercase ${q.type === 'choice' ? 'bg-blue-50 text-blue-500' : q.type === 'multiple' ? 'bg-orange-50 text-orange-500' : 'bg-purple-50 text-purple-500'}`}>
+                    {q.type === 'choice' ? '單選' : q.type === 'multiple' ? '複選' : '填空'}
+                  </span>
+                  <span className="text-indigo-600 font-black text-xs underline underline-offset-4 text-left">{q.points} Pts</span>
+                </div>
                 <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 text-left"><FormattedText content={q.text} className="text-sm text-slate-700 text-left" /></div>
-                {q.type === 'choice' && (<div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">{q.options.map((opt, i) => (<div key={i} className="flex items-start gap-2 bg-slate-50/50 p-2 rounded-lg text-xs text-left"><span className="font-black text-slate-400 text-left">{String.fromCharCode(65+i)}.</span><FormattedText content={opt} className="text-slate-600 flex-1 text-left" /></div>))}</div>)}
+                {(q.type === 'choice' || q.type === 'multiple') && (<div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 text-left">{q.options.map((opt, i) => (<div key={i} className="flex items-start gap-2 bg-slate-50/50 p-2 rounded-lg text-xs text-left"><span className="font-black text-slate-400 text-left">{String.fromCharCode(65+i)}.</span><FormattedText content={opt} className="text-slate-600 flex-1 text-left" /></div>))}</div>)}
                 <div className="mt-4 font-black text-green-600 px-2 text-sm text-left">標竿答案：{q.answer}</div></div>
                 <div className="flex md:flex-col gap-2 shrink-0 text-left"><button onClick={() => setEditingQ(q)} className="p-4 bg-slate-50 text-indigo-500 hover:bg-indigo-500 hover:text-white rounded-2xl transition flex items-center justify-center shadow-sm"><Edit3 size={20}/></button>
                 <button onClick={async () => { if(confirm('確定刪除題目？')) { await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'questions', q.id)); showToast("題目已刪除"); } }} className="p-4 bg-slate-50 text-red-500 hover:bg-red-500 hover:text-white rounded-2xl transition flex items-center justify-center shadow-sm text-red-500"><Trash2 size={20}/></button></div>
@@ -512,7 +550,7 @@ const AdminDashboard = memo(({ records, exams, questions, onBack, onTestExam, ap
 
       {/* --- 全局 事後通知 (Toast) --- */}
       {toast.show && (
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] animate-bounce">
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] animate-bounce text-white">
           <div className="bg-green-600 text-white px-8 py-4 rounded-full shadow-2xl flex items-center gap-3 border border-white/20 backdrop-blur-md">
             <CheckCircle2 size={20} className="text-white" />
             <span className="font-black tracking-tight">{toast.message}</span>
@@ -523,23 +561,23 @@ const AdminDashboard = memo(({ records, exams, questions, onBack, onTestExam, ap
       {/* --- 全局 Modals --- */}
       
       {viewingRecord && (
-        <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-xl z-[60] flex items-center justify-center p-4 text-slate-800 text-left">
+        <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-xl z-[60] flex items-center justify-center p-4 text-slate-800 text-left text-white">
           <div className="bg-white rounded-[3rem] shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col text-left border border-white/10">
-            <div className="p-8 border-b flex justify-between items-center bg-slate-50 text-left">
+            <div className="p-8 border-b flex justify-between items-center bg-slate-50 text-left text-slate-800">
               <div className="flex items-center gap-6 text-left"><div className="w-16 h-16 bg-slate-900 rounded-3xl flex flex-col items-center justify-center text-white shadow-lg"><span className="text-[0.5rem] font-bold opacity-50 uppercase tracking-widest text-white">Total</span><span className="text-2xl font-black tracking-tighter text-white">{(viewingRecord.choiceScore || 0) + gradingAnswers.reduce((acc, curr) => { const q = viewingRecord.answers.find(ans => ans.qId === curr.qId); return acc + (q?.type === 'fill' ? curr.val : 0); }, 0)}</span></div>
               <div className="text-left"><h3 className="font-black text-2xl text-slate-800 text-left">{viewingRecord.studentName}</h3><p className="text-xs text-slate-400 font-bold uppercase tracking-widest text-left">{viewingRecord.studentId} • 閱卷系統</p></div></div>
-              <button onClick={() => setViewingRecord(null)} className="p-2 text-slate-300 hover:text-red-500 transition flex items-center justify-center"><X size={32}/></button>
+              <button onClick={() => setViewingRecord(null)} className="p-2 text-slate-300 hover:text-red-500 transition flex items-center justify-center text-slate-300"><X size={32}/></button>
             </div>
             <div className="p-10 space-y-8 overflow-y-auto flex-1 bg-slate-50/50 text-left text-slate-800">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">{viewingRecord.answers.map((a, idx) => (<div key={idx} className={`p-8 rounded-[2.5rem] border-2 bg-white transition-all text-left ${a.type === 'choice' ? 'border-slate-100 opacity-60' : 'border-indigo-500 shadow-xl ring-8 ring-indigo-500/5'}`}>
-                <div className="flex justify-between items-center mb-6 text-left"><div className="flex items-center gap-2 text-left"><span className="bg-slate-100 text-slate-400 px-3 py-1 rounded-xl text-[0.6rem] font-black uppercase tracking-tighter text-left">Q{idx+1}</span><span className={`px-3 py-1 rounded-xl text-[0.6rem] font-black uppercase text-left ${a.type === 'choice' ? 'bg-blue-50 text-blue-500' : 'bg-purple-50 text-purple-500'}`}>{a.type === 'choice' ? '選擇' : '填空'}</span></div><div className="font-black text-xs text-slate-400 text-left">{a.points} Pts</div></div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-left">{viewingRecord.answers.map((a, idx) => (<div key={idx} className={`p-8 rounded-[2.5rem] border-2 bg-white transition-all text-left ${(a.type === 'choice' || a.type === 'multiple') ? 'border-slate-100 opacity-60' : 'border-indigo-500 shadow-xl ring-8 ring-indigo-500/5'}`}>
+                <div className="flex justify-between items-center mb-6 text-left"><div className="flex items-center gap-2 text-left"><span className="bg-slate-100 text-slate-400 px-3 py-1 rounded-xl text-[0.6rem] font-black uppercase tracking-tighter text-left">Q{idx+1}</span><span className={`px-3 py-1 rounded-xl text-[0.6rem] font-black uppercase text-left ${a.type === 'choice' ? 'bg-blue-50 text-blue-500' : a.type === 'multiple' ? 'bg-orange-50 text-orange-500' : 'bg-purple-50 text-purple-500'}`}>{a.type === 'choice' ? '單選' : a.type === 'multiple' ? '複選' : '填空'}</span></div><div className="font-black text-xs text-slate-400 text-left">{a.points} Pts</div></div>
                 <div className="bg-slate-50 p-4 rounded-2xl mb-6 border border-slate-100 text-left"><FormattedText content={a.qText} className="text-xs text-slate-600 h-24 overflow-y-auto text-left" /></div>
-                <div className="space-y-4 text-left"><div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 text-left"><label className="text-[0.6rem] font-black text-indigo-400 uppercase block mb-1 text-left">考生回答</label><FormattedText content={a.studentAns || "(未答)"} className="font-black text-indigo-900 text-lg text-left" /></div>
-                <div className="p-4 bg-green-50 rounded-2xl border border-green-100 text-left"><label className="text-[0.6rem] font-black text-green-400 uppercase block mb-1 text-left">正確答案</label><FormattedText content={a.correctAns} className="font-black text-green-800 text-lg text-left" /></div>
+                <div className="space-y-4 text-left"><div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 text-left"><label className="text-[0.6rem] font-black text-indigo-400 uppercase block mb-1 text-left text-indigo-400">考生回答</label><FormattedText content={a.studentAns || "(未答)"} className="font-black text-indigo-900 text-lg text-left" /></div>
+                <div className="p-4 bg-green-50 rounded-2xl border border-green-100 text-left"><label className="text-[0.6rem] font-black text-green-400 uppercase block mb-1 text-left text-green-400">正確答案</label><FormattedText content={a.correctAns} className="font-black text-green-800 text-lg text-left" /></div>
                 {a.type === 'fill' && (<div className="pt-4 flex items-center gap-4 text-left text-slate-800"><label className="text-xs font-black uppercase text-left">評分：</label><input type="number" max={a.points} min={0} className="w-24 p-3 bg-white border-2 border-indigo-200 rounded-xl font-black text-center outline-none shadow-sm text-slate-800" value={gradingAnswers.find(ga => ga.qId === a.qId)?.val ?? 0} onChange={(e) => { const val = Math.min(a.points, Math.max(0, parseInt(e.target.value) || 0)); setGradingAnswers(prev => prev.map(p => p.qId === a.qId ? { ...p, val } : p)); }} /><span className="text-slate-400 text-xs font-bold text-left">/ {a.points}</span></div>)}</div></div>))}</div>
             </div>
-            <div className="p-8 border-t bg-white flex gap-4 justify-center shadow-inner text-left"><button onClick={saveManualGrades} className="px-12 py-5 bg-indigo-600 text-white rounded-[2rem] font-black hover:bg-indigo-700 transition flex items-center justify-center gap-2 shadow-xl shadow-indigo-500/20 active:scale-95 text-white"><Save size={20}/> 儲存分數</button>
-            <button onClick={() => setViewingRecord(null)} className="px-12 py-5 bg-slate-100 text-slate-600 rounded-[2rem] font-black hover:bg-slate-200 transition flex items-center justify-center text-slate-600">取消</button></div>
+            <div className="p-8 border-t bg-white flex gap-4 justify-center shadow-inner text-left text-slate-800"><button onClick={saveManualGrades} className="px-12 py-5 bg-indigo-600 text-white rounded-[2rem] font-black hover:bg-indigo-700 transition flex items-center justify-center gap-2 shadow-xl shadow-indigo-500/20 active:scale-95 text-white text-white"><Save size={20}/> 儲存分數</button>
+            <button onClick={() => setViewingRecord(null)} className="px-12 py-5 bg-slate-100 text-slate-600 rounded-[2rem] font-black hover:bg-slate-200 transition flex items-center justify-center text-slate-600 text-slate-600">取消</button></div>
           </div>
         </div>
       )}
@@ -549,10 +587,10 @@ const AdminDashboard = memo(({ records, exams, questions, onBack, onTestExam, ap
           <div className="bg-white rounded-[2.5rem] p-10 w-full max-w-md shadow-2xl flex flex-col items-center text-left border border-white/20">
             <h3 className="text-xl font-black mb-8 w-full text-center text-slate-800">考卷設定</h3>
             <form onSubmit={saveExam} className="space-y-6 w-full text-left">
-              <div className="text-left w-full"><label className="text-[0.65rem] font-black text-slate-400 mb-2 block uppercase ml-1 text-left">標題名稱</label>
+              <div className="text-left w-full"><label className="text-[0.65rem] font-black text-slate-400 mb-2 block uppercase ml-1 text-left text-slate-400">標題名稱</label>
               <input name="title" defaultValue={editingExam.title} required autoFocus className="w-full p-5 bg-slate-50 rounded-2xl font-bold shadow-inner border-none outline-none focus:ring-2 focus:ring-indigo-600 transition-all text-slate-700 text-left" /></div>
-              <div className="flex gap-4 justify-center text-left"><button type="submit" disabled={isSaving} className="flex-1 bg-slate-900 text-white py-4 rounded-xl font-black shadow-lg hover:bg-black transition text-white text-left flex items-center justify-center">{isSaving ? '儲存中...' : '確認'}</button>
-              <button type="button" onClick={() => setEditingExam(null)} className="flex-1 bg-slate-100 py-4 rounded-xl font-black text-slate-600 hover:bg-slate-200 transition flex items-center justify-center text-slate-600">取消</button></div>
+              <div className="flex gap-4 justify-center text-left"><button type="submit" disabled={isSaving} className="flex-1 bg-slate-900 text-white py-4 rounded-xl font-black shadow-lg hover:bg-black transition text-white text-left flex items-center justify-center text-white">{isSaving ? '儲存中...' : '確認'}</button>
+              <button type="button" onClick={() => setEditingExam(null)} className="flex-1 bg-slate-100 py-4 rounded-xl font-black text-slate-600 hover:bg-slate-200 transition flex items-center justify-center text-slate-600 text-slate-600">取消</button></div>
             </form>
           </div>
         </div>
@@ -628,14 +666,17 @@ const App = () => {
       const loaded = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setExams(loaded);
       setActiveExam(loaded.find(e => e.isActive) || null);
-    });
+    }, (err) => console.error(err));
+
     const unsubQ = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'questions'), (snapshot) => {
       setQuestions(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setIsLoading(false);
-    });
+    }, (err) => console.error(err));
+
     const unsubR = onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'records'), (snapshot) => {
       setRecords(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    });
+    }, (err) => console.error(err));
+
     return () => { unsubExams(); unsubQ(); unsubR(); };
   }, [user]);
 
@@ -664,16 +705,55 @@ const App = () => {
     const examQs = allQs.filter(q => q.examId === ae.id);
     let choiceScore = 0;
     const graded = examQs.map(q => {
-      if (q.type === 'choice') {
-        const isCorrect = String(ans[q.id] || '').trim().toUpperCase() === String(q.answer).trim().toUpperCase();
+      const studentRaw = String(ans[q.id] || '').trim().replace(/,/g, '').toUpperCase();
+      const studentSorted = studentRaw.split('').sort().join('');
+      
+      const correctRaw = String(q.answer || '').trim().replace(/,/g, '').toUpperCase();
+      const correctSorted = correctRaw.split('').sort().join('');
+
+      if (q.type === 'choice' || q.type === 'multiple') {
+        const isCorrect = studentSorted === correctSorted && studentSorted !== "";
         if (isCorrect) choiceScore += q.points;
-        return { qId: q.id, qText: q.text, type: q.type, correctAns: q.answer, studentAns: ans[q.id] || '', isCorrect, points: q.points, earnedPoints: isCorrect ? q.points : 0 };
+        return { 
+          qId: q.id, 
+          qText: q.text, 
+          type: q.type, 
+          correctAns: q.answer, 
+          studentAns: ans[q.id] || '', 
+          isCorrect, 
+          points: q.points, 
+          earnedPoints: isCorrect ? q.points : 0 
+        };
       } else {
-        return { qId: q.id, qText: q.text, type: q.type, correctAns: q.answer, studentAns: ans[q.id] || '', isCorrect: false, points: q.points, earnedPoints: 0, isManuallyGraded: false };
+        // 填空題預設不自動閱卷或僅作參考，這裡設為需手動閱卷
+        return { 
+          qId: q.id, 
+          qText: q.text, 
+          type: q.type, 
+          correctAns: q.answer, 
+          studentAns: ans[q.id] || '', 
+          isCorrect: false, 
+          points: q.points, 
+          earnedPoints: 0, 
+          isManuallyGraded: false 
+        };
       }
     });
 
-    const record = { examId: ae.id, examTitle: ae.title, studentId: si.id || "TESTER", studentName: si.name || "測試模式", choiceScore, fillScore: 0, totalScore: choiceScore, answers: graded, timestamp: new Date().toISOString(), isTerminated: isForced };
+    const record = { 
+      examId: ae.id, 
+      examTitle: ae.title, 
+      studentId: si.id || "TESTER", 
+      studentName: si.name || "測試模式", 
+      choiceScore, 
+      fillScore: 0, 
+      totalScore: choiceScore, 
+      score: choiceScore, // 相容舊版欄位
+      answers: graded, 
+      timestamp: new Date().toISOString(), 
+      isTerminated: isForced 
+    };
+
     if (tm) { setExamResult(record); setView('result'); return; }
     try {
       await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'records'), record);
